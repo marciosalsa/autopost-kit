@@ -129,7 +129,9 @@ def enrich(store: SteamStore, item: Item) -> Item:
 
     item.title = details.get("name") or item.title
     item.image_url = details.get("header_image") or item.image_url
+    screenshots = details.get("screenshots") or []
     item.meta.update(
+        screenshot=(screenshots[0].get("path_full") if screenshots else None),
         genres=[g.get("description") for g in details.get("genres") or [] if g.get("description")],
         developers=details.get("developers") or [],
         publishers=details.get("publishers") or [],

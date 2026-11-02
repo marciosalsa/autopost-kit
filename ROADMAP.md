@@ -18,16 +18,25 @@ Ids in brackets refer to the requirements list (RF = functional, RNF = non-funct
 - [ ] Cache store responses on disk for a few hours, so re-runs are cheap [RNF05]
 - [ ] Handle prices for non-US regions and free-to-play labels [RF03]
 
-## Milestone 2: Build the post
+## Milestone 2: Build the post (in progress)
 
-- [ ] Core: `Post` and `Slide` models; carousel limit of 10 slides
-- [ ] Steam `select()`: decide what fits when a day has 200+ games (see open question)
-- [ ] Core: slide renderer with Pillow and token templates (`{date}`, `{total}`, `{name}`, `{genre}`) [RF07, RF08]
-- [ ] Steam templates: cover slide, list slide (10 × `Name — Genre`), capsule highlight slide [RF07]
-- [ ] Core: caption templates with tokens and hashtags [RF09]
-- [ ] Core: i18n, English first, every text in a locale file [RNF08]
-- [ ] Note on every post: dates come from Steam and may change [RF20]
-- [ ] `autopost-kit build steam_releases --dry-run` writes slides + caption to `output/` [RF14]
+Format decided: a cover listing the top 5 (1 → 5), then one slide per game
+counting down 5 → 1. 1080×1350 slides, fixed channel frame. Music is added by
+hand in the Instagram app during review.
+
+- [x] Core: `Post` and `Slide` models; carousel limit of 10 slides
+- [x] Core: drawing primitives (fonts, text fitting, cover crop, gradients, pills) [RF08]
+- [x] Core: cached image downloads
+- [x] Core: i18n, English first, every text in a locale file with `{tokens}` [RNF08]
+- [x] Core: generic `build` pipeline and `save_post` to `output/<topic>/<date>/` [RF14]
+- [x] Steam `select()`: top 5 by popularity, skipping blocked words and postponed games [RF04, RF19]
+- [x] Steam: genres cleanup ("Indie" only when alone) and badges (Early Access, Free to Play, price)
+- [x] Steam templates: cover and countdown game slides [RF07]
+- [x] Steam caption: list, studio credits, "+N more", hashtags [RF09]
+- [x] CLI: `autopost-kit build steam_releases`
+- [ ] Fallback when a game has no screenshot (header art enlarged, blurred background)
+- [ ] Prefer screenshots that show gameplay over ones that are mostly text or logos
+- [ ] Visual regression test: compare rendered slides to approved reference images
 
 ## Milestone 3: Review and history
 
@@ -51,12 +60,14 @@ Ids in brackets refer to the requirements list (RF = functional, RNF = non-funct
 
 ## Later
 
+- [ ] Reel version of each post: slides as a ~15 s video with an NCS track baked in,
+      credit added to the caption (ffmpeg). Check NCS terms for automated use first.
+- [ ] Short trailer clips from Steam (HLS) as video slides or Reels
 - [ ] AI-written caption variants, with prompts kept inside the topic [RF10]
 - [ ] More languages for posts
 - [ ] More topics (other stores, other subjects) using the same core
 
-## Open questions
+## Decisions
 
-- **Busy days.** Some days have 200+ games (Nov 2, 2026: 203 full games). The carousel holds
-  at most 8 list slides × 10 names = 80 games. Options: list only the top N by
-  popularity and end with "+ X more on Steam", or split into two posts.
+- **Busy days** (Nov 2, 2026 had 191 eligible games): post only the top 5 by
+  popularity; the cover and caption still show the day's total.

@@ -27,3 +27,6 @@ output/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Music tracks: licensed for use, not for redistribution
+music/

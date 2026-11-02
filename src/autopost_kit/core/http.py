@@ -51,6 +51,12 @@ class PoliteClient:
         self._last_request = self._clock()
 
     def get_json(self, url: str, params: dict[str, Any] | None = None) -> Any:
+        return self._get(url, params).json()
+
+    def get_bytes(self, url: str, params: dict[str, Any] | None = None) -> bytes:
+        return self._get(url, params).content
+
+    def _get(self, url: str, params: dict[str, Any] | None = None) -> requests.Response:
         attempt = 0
         while True:
             self._wait_turn()
@@ -58,7 +64,7 @@ class PoliteClient:
                 response = self.session.get(url, params=params, timeout=self.timeout)
                 if response.status_code not in RETRY_STATUS:
                     response.raise_for_status()
-                    return response.json()
+                    return response
                 error: Exception = requests.HTTPError(f"HTTP {response.status_code}")
             except (requests.ConnectionError, requests.Timeout) as exc:
                 error = exc

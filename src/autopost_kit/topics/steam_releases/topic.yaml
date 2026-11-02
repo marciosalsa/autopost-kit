@@ -7,7 +7,7 @@ days_ahead: 1
 
 # Store region and language used for names, dates and prices.
 country: us
-language: english
+store_language: english
 
 # Only full games: leaves out soundtracks, demos and DLC listed for the same day.
 only_games: true
@@ -17,6 +17,43 @@ only_games: true
 #   3 = adult only sexual content       4 = frequent nudity or sexual content
 #   5 = general mature content
 excluded_content_descriptors: [3, 4]
+
+# What goes into the post: the N most popular games, countdown style.
+top_n: 5
+
+# Games whose title contains any of these words (whole word, any case) are
+# never posted; the next most popular game takes their place.
+blocked_words:
+  - abuse
+  - rape
+  - porn
+  - hentai
+  - sex
+  - sexy
+  - nsfw
+  - nazi
+  - hitler
+  - genocide
+  - terrorist
+  - great again
+  - election
+  - president
+
+# Post language (a file in locales/) and hashtags for the caption.
+language: en
+hashtags: "#steam #newgames #pcgaming #gaming #indiegames #upcominggames"
+
+# Visual identity of the channel (colors as hex, size in pixels).
+theme:
+  width: 1080
+  height: 1350
+  margin: 64
+  background: "#0d1117"
+  accent: "#7cf2c7"
+  text: "#f2f5f9"
+  muted: "#9aa7b6"
+  divider: "#232a33"
+  on_accent: "#06120d"
 
 # Safety limits for scanning the store.
 max_search_pages: 40        # Steam returns 25-100 games per page

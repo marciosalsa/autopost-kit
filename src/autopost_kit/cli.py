@@ -9,7 +9,9 @@ import sys
 from datetime import date
 
 from autopost_kit import __version__
+from autopost_kit.core import pipeline
 from autopost_kit.core.models import Item
+from autopost_kit.core.output import save_post
 from autopost_kit.core.registry import TOPICS, get_topic
 
 
@@ -41,6 +43,19 @@ def cmd_collect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build(args: argparse.Namespace) -> int:
+    topic = get_topic(args.topic)()
+    target = date.fromisoformat(args.date) if args.date else None
+    post = pipeline.build(topic, target)
+    folder = save_post(post, args.out)
+    print(f"\n{len(post.slides)} slides for {post.target:%b %d, %Y} saved to {folder}\n")
+    for n, slide in enumerate(post.slides, start=1):
+        print(f"  slide_{n:02d}.png  {slide.label}")
+    print("\n--- caption.txt ---\n")
+    print(post.caption)
+    return 0
+
+
 def cmd_topics(_: argparse.Namespace) -> int:
     for name, cls in sorted(TOPICS.items()):
         summary = (cls.__doc__ or "").strip().splitlines()
@@ -60,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--details", type=int, default=10, help="fetch full details for the top N (default 10, 0 = none)")
     collect.add_argument("--json", action="store_true", help="print JSON instead of a table")
     collect.set_defaults(func=cmd_collect)
+
+    build = sub.add_parser("build", help="collect, select and render a post (nothing is published)")
+    build.add_argument("topic", help="topic id, e.g. steam_releases")
+    build.add_argument("--date", help="target day (YYYY-MM-DD); default: the topic's next day")
+    build.add_argument("--out", default="output", help="output folder (default: output)")
+    build.set_defaults(func=cmd_build)
 
     topics = sub.add_parser("topics", help="list available topics")
     topics.set_defaults(func=cmd_topics)

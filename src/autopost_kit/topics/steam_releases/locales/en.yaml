@@ -1,0 +1,27 @@
+# English strings for the steam_releases topic. Tokens in {braces} are filled in by the code.
+
+handle: "@tomorrowonsteam"
+cover_title_1: "TOMORROW"
+cover_title_2a: "ON "
+cover_title_2b: "STEAM"
+cover_count_strong: "{total} new games"
+cover_count_rest: " · here are the top {count}"
+swipe: "swipe →"
+by_studio: "by "
+footer: "@tomorrowonsteam · Source: Steam"
+
+caption: |
+  🎮 Tomorrow on Steam: {date_long}
+
+  {total} new games launch tomorrow. These are the {count} most anticipated:
+
+  {lines}
+
+  {more_line}Which one are you playing? Tell us below 👇
+
+  Game data and images from the Steam store. All game art belongs to its creators.
+
+  {hashtags}
+
+caption_line: "{position}. {name}: {genres} · by {studio}"
+caption_more: "+{more} more on Steam tomorrow.\n\n"

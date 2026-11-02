@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from autopost_kit.core.models import Item
+from autopost_kit.core.models import Item, Post
 
 
 class Topic(ABC):
@@ -22,7 +22,7 @@ class Topic(ABC):
 
     #: Unique id used on the command line, e.g. ``steam_releases``.
     name: str = ""
-    #: Package that holds this topic's ``topic.yaml``.
+    #: Package that holds this topic's ``topic.yaml`` and ``locales/``.
     config_package: str = ""
 
     def __init__(self, overrides: dict[str, Any] | None = None) -> None:
@@ -49,6 +49,9 @@ class Topic(ABC):
         """Pick what goes into the post. Default: everything, in order."""
         return items
 
-    def build_post(self, items: list[Item]):  # pragma: no cover - planned
-        """Turn selected items into slides and a caption (ROADMAP milestone 2)."""
-        raise NotImplementedError("Post building is planned: see ROADMAP.md, milestone 2.")
+    @abstractmethod
+    def build_post(self, target: date, selected: list[Item], total: int) -> Post:
+        """Turn the selected items into slides and a caption.
+
+        ``total`` is how many candidates were collected before selection.
+        """
