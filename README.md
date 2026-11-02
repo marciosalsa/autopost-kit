@@ -28,7 +28,7 @@ on Steam *tomorrow*, for the Instagram account
 
 Carousel for `steam_releases` (6 slides, 1080×1350):
 
-1. **Cover**: the day's total ("191 new games") and the top 5, from 1 to 5
+1. **Cover**: the day's total ("191 new games") and the top 5, from 5 to 
 2. **Countdown**: one slide per game from #5 to #1, with a Steam screenshot,
    the store header art, genres, studio and a badge (Early Access, Free to Play or price)
 

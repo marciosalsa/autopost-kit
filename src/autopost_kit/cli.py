@@ -56,6 +56,48 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _instagram():
+    from autopost_kit.core.publishers.instagram import InstagramClient
+    from autopost_kit.core.settings import InstagramSettings
+
+    s = InstagramSettings.from_env()
+    return InstagramClient(s.access_token, user_id=s.user_id, api_version=s.api_version)
+
+
+def cmd_instagram_check(_: argparse.Namespace) -> int:
+    client = _instagram()
+    account = client.account()
+    print(f"Connected to @{account.get('username')} (id {account.get('id')})")
+    if "followers_count" in account:
+        print(f"Followers: {account['followers_count']}  Posts: {account.get('media_count', 0)}")
+    quota = client.publishing_quota()
+    if quota:
+        limit = (quota.get("config") or {}).get("quota_total", "?")
+        print(f"API posts in the last 24h: {quota.get('quota_usage', 0)} of {limit}")
+    return 0
+
+
+def cmd_publish_reel(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from autopost_kit.core.publish import publish_reel
+    from autopost_kit.core.settings import S3Settings
+    from autopost_kit.core.storage import S3Storage
+
+    video = Path(args.video)
+    if not video.exists():
+        raise SystemExit(f"Video not found: {video}")
+    caption = Path(args.caption).read_text(encoding="utf-8") if args.caption else ""
+    s3 = S3Settings.from_env()
+    result = publish_reel(video, caption, _instagram(), S3Storage(s3.bucket, s3.region), confirm=args.yes)
+    if result.published:
+        print(f"Published! {result.permalink or result.media_id}")
+    else:
+        print("Dry run OK: Instagram accepted and processed the Reel, but it was NOT published.")
+        print("Run again with --yes to publish it for real.")
+    return 0
+
+
 def cmd_topics(_: argparse.Namespace) -> int:
     for name, cls in sorted(TOPICS.items()):
         summary = (cls.__doc__ or "").strip().splitlines()
@@ -82,12 +124,28 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--out", default="output", help="output folder (default: output)")
     build.set_defaults(func=cmd_build)
 
+    instagram = sub.add_parser("instagram", help="Instagram account tools")
+    ig_sub = instagram.add_subparsers(dest="ig_command", required=True)
+    ig_sub.add_parser("check", help="check the token and show the connected account").set_defaults(
+        func=cmd_instagram_check)
+
+    publish = sub.add_parser("publish", help="publish media to Instagram (dry run unless --yes)")
+    pub_sub = publish.add_subparsers(dest="pub_command", required=True)
+    reel = pub_sub.add_parser("reel", help="publish an MP4 as a Reel")
+    reel.add_argument("video", help="path to the .mp4 file")
+    reel.add_argument("--caption", help="path to a text file with the caption")
+    reel.add_argument("--yes", action="store_true", help="really publish (without it: everything but publishing)")
+    reel.set_defaults(func=cmd_publish_reel)
+
     topics = sub.add_parser("topics", help="list available topics")
     topics.set_defaults(func=cmd_topics)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    from autopost_kit.core.settings import load_env
+
+    load_env()
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format="%(levelname)s %(message)s")
     return args.func(args)
