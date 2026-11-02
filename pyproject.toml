@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autopost-kit"
+version = "0.1.0"
+description = "A pluggable engine that turns public data into Instagram carousels."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Marcio Salsa" }]
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "PyYAML>=6.0",
+    "tzdata>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+autopost-kit = "autopost_kit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"autopost_kit.topics.steam_releases" = ["topic.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,24 @@
+# Settings for the "steam_releases" topic.
+# Every value can be overridden from the command line or, later, a user config file.
+
+# Steam's store calendar follows Pacific time, so "tomorrow" is computed there.
+timezone: America/Los_Angeles
+days_ahead: 1
+
+# Store region and language used for names, dates and prices.
+country: us
+language: english
+
+# Only full games: leaves out soundtracks, demos and DLC listed for the same day.
+only_games: true
+
+# Steam content descriptor ids to leave out of posts:
+#   1 = some nudity or sexual content   2 = frequent violence or gore
+#   3 = adult only sexual content       4 = frequent nudity or sexual content
+#   5 = general mature content
+excluded_content_descriptors: [3, 4]
+
+# Safety limits for scanning the store.
+max_search_pages: 40        # Steam returns 25-100 games per page
+popularity_pages: 12        # pages of "popular upcoming" used to rank games
+request_interval_seconds: 1.5
