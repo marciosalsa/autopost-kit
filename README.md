@@ -1,6 +1,6 @@
 # autopost-kit
 
-A pluggable engine that turns public data into Instagram carousels.
+A pluggable engine that turns public data into Instagram Reels and carousels.
 
 The **core** knows how to build posts: slides, captions, review, publishing,
 scheduling and history. A **topic** is a small plugin that says where the data
@@ -11,8 +11,10 @@ The first topic is **`steam_releases`**: every day it lists the games coming out
 on Steam *tomorrow*, for the Instagram account
 [@tomorrowonsteam](https://www.instagram.com/tomorrowonsteam/).
 
-> Status: early development. Collecting and building posts work; review,
-> history and publishing are next. See [ROADMAP.md](ROADMAP.md).
+> Status: working end to end and posting daily: collect → select → render a
+> beat-synced Reel with game trailers → publish through the Instagram API.
+> Next: an architecture refactor (ports and adapters, the Steam topic as its own
+> package). See [ROADMAP.md](ROADMAP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## How it works
 
@@ -26,21 +28,30 @@ on Steam *tomorrow*, for the Instagram account
  └──────────────────────────────────┘     └─────────────────────────────────────┘
 ```
 
-Carousel for `steam_releases` (6 slides, 1080×1350):
+Every day the `steam_releases` topic picks the 5 most anticipated games
+launching tomorrow and makes:
 
-1. **Cover**: the day's total ("191 new games") and the top 5, from 5 to 
-2. **Countdown**: one slide per game from #5 to #1, with a Steam screenshot,
-   the store header art, genres, studio and a badge (Early Access, Free to Play or price)
+- **A Reel** (1080×1920, about a minute): a cover with the day's total and the
+  top 5, then a countdown from #5 to #1. Each game plays a stretch of its Steam
+  trailer over a blurred copy of itself, with rank, name, genres, studio and a
+  badge (Early Access, Free to Play or price). Cuts land on the beat of an NCS song.
+- **A carousel** (6 slides, 1080×1350) with the same countdown and Steam screenshots.
 
 The caption lists the 5 games with studio credits, how many more launch that
-day and the hashtags.
+day, the hashtags and the song credit.
 
 ### Reels with music
 
 Put songs in `music/` (ignored by git). `autopost-kit reel <post folder>` (or
-`build ... --reel`) turns the slides into `reel.mp4` (9:16, 3 s per slide) with
-a song that hasn't been used yet, and writes `reel_caption.txt` with the song
-credit (from `music/<song>.txt` when present, otherwise from the file name).
+`build ... --reel`) makes `reel.mp4` with a song that hasn't been used yet, and
+writes `reel_caption.txt` with the song credit (from `music/<song>.txt` when
+present, otherwise from the file name).
+
+With the optional `music` extra, each song is analysed once (tempo, beats and
+where its strong part starts, cached as `<song>.beats.json`) and every scene
+lasts a whole number of bars, so cuts land on the beat. Trailers are read from
+Steam's streams with ffmpeg; a game without a trailer falls back to a
+screenshot. `--slideshow` makes the older slide-based Reel instead.
 A song is logged in `music/used.json` only when the Reel is published with
 `--yes`; once every song was used, the one used longest ago comes back.
 `autopost-kit music` lists the songs and their status. Requires `ffmpeg`.
@@ -49,6 +60,9 @@ A song is logged in `music/used.json` only when the Reel is published with
 
 - Python 3.10+
 - Internet access to `store.steampowered.com`
+- [ffmpeg](https://ffmpeg.org/) for Reels (Windows: `winget install --id Gyan.FFmpeg -e`)
+- To publish: an Instagram professional account connected to a Meta app
+  (Instagram API with Unified Login) and a private S3 bucket. See [`.env.example`](.env.example).
 
 ## Install
 
@@ -57,7 +71,7 @@ git clone https://github.com/marciosalsa/autopost-kit.git
 cd autopost-kit
 python -m venv .venv
 # Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,music]"   # "music" adds beat-synced cuts (librosa)
 ```
 
 ## Usage
@@ -74,6 +88,21 @@ autopost-kit build steam_releases --date 2026-11-03
 
 `build` writes `slide_01.png` … `slide_06.png`, `caption.txt` and `post.json`
 to `output/steam_releases/<date>/`. Nothing is published.
+
+Reels and publishing:
+
+```bash
+autopost-kit build steam_releases --reel             # post + reel.mp4
+autopost-kit reel output/steam_releases/2026-11-04   # Reel for an existing post
+autopost-kit music                                    # songs and which ones were used
+autopost-kit instagram check                          # token and connected account
+autopost-kit publish reel output/steam_releases/2026-11-04/reel.mp4        # dry run
+autopost-kit publish reel output/steam_releases/2026-11-04/reel.mp4 --yes  # publish
+```
+
+Publishing uploads the video to S3, hands Instagram a pre-signed link that
+expires in an hour, waits until Instagram has processed it and deletes the
+upload. Without `--yes` it does everything except the final publish.
 
 Example output:
 
@@ -142,10 +171,14 @@ Tests use saved fixtures and fake clients, so they never call Steam.
 ```
 src/autopost_kit/
 ├── cli.py                    # command line
-├── core/                     # generic: models, topic contract, http, dates
+├── core/                     # generic engine: models, topic contract, rendering,
+│   │                         # video/beats/music, S3, daily runs
+│   └── publishers/           # Instagram
 └── topics/
-    └── steam_releases/       # collector, Steam client, parsing, topic.yaml
-tests/                        # pytest suite and fixtures
+    └── steam_releases/       # collector, Steam client, parsing, selector, layouts
+scripts/run_daily.cmd         # called hourly by Windows Task Scheduler
+docs/ARCHITECTURE.md          # current design, target design and refactor plan
+tests/                        # pytest suite and fixtures (no network needed)
 ```
 
 ## License
