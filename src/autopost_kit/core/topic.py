@@ -17,6 +17,17 @@ import yaml
 from autopost_kit.core.models import Item, Post
 
 
+def deep_merge(base: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+    """``base`` with ``changes`` applied; nested dicts are merged, not replaced."""
+    merged = dict(base)
+    for key, value in changes.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 class Topic(ABC):
     """Base class for a subject the engine can post about."""
 
@@ -34,8 +45,7 @@ class Topic(ABC):
         if cls.config_package:
             text = resources.files(cls.config_package).joinpath("topic.yaml").read_text("utf-8")
             config = yaml.safe_load(text) or {}
-        config.update(overrides or {})
-        return config
+        return deep_merge(config, overrides or {})
 
     @abstractmethod
     def target_date(self) -> date:

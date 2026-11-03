@@ -30,3 +30,6 @@ Thumbs.db
 
 # Music tracks: licensed for use, not for redistribution
 music/
+
+# Personal run settings (copy of autopost.example.yaml)
+autopost.yaml

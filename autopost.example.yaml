@@ -1,0 +1,40 @@
+# Your daily runs. Copy this file to autopost.yaml and change it to your taste.
+# autopost.yaml is ignored by git, so your choices stay on your computer.
+#
+# The Windows scheduler only calls `autopost-kit run` every hour; this file
+# decides what happens and when. Run `autopost-kit run --dry` to see what
+# would happen right now without doing anything.
+
+# Default timezone for every job (names from the tz database).
+timezone: America/Los_Angeles
+
+# Where songs and finished posts live (relative to the project folder).
+music_folder: music
+output: output
+
+jobs:
+  - topic: steam_releases
+
+    # Local time (24h, in `timezone`) after which the job runs once a day.
+    # 00:05 Pacific = 04:05 or 05:05 in Brasília, depending on US daylight saving.
+    at: "00:05"
+
+    # Which day the post is about: 1 = tomorrow.
+    days_ahead: 1
+
+    # reel | carousel | both   (carousels are built but not published yet)
+    format: reel
+
+    # off    = only build the post (slides, caption, Reel)
+    # review = build and let Instagram check the Reel, but don't publish
+    # auto   = build and publish
+    publish: review
+
+    # Anything from the topic's topic.yaml can be changed here.
+    settings:
+      top_n: 5
+      reel:
+        cover_seconds: 3.7
+        clip_seconds: 11
+      # hashtags: "#steam #newgames #pcgaming"
+      # blocked_words: [abuse, nsfw]

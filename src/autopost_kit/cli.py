@@ -6,7 +6,7 @@ import argparse
 import json
 import logging
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 
 from autopost_kit import __version__
 from autopost_kit.core import pipeline
@@ -137,25 +137,83 @@ def cmd_instagram_check(_: argparse.Namespace) -> int:
 def cmd_publish_reel(args: argparse.Namespace) -> int:
     from pathlib import Path
 
-    from autopost_kit.core.publish import publish_reel
-    from autopost_kit.core.settings import S3Settings
-    from autopost_kit.core.storage import S3Storage
-
     video = Path(args.video)
     if not video.exists():
         raise SystemExit(f"Video not found: {video}")
     caption_path = Path(args.caption) if args.caption else video.with_name("reel_caption.txt")
     if args.caption and not caption_path.exists():
         raise SystemExit(f"Caption not found: {caption_path}")
+    result = _publish_video(video, args.yes, caption_path)
+    if not result.published:
+        print("Run again with --yes to publish it for real.")
+    return 0
+
+
+def _publish_video(video, confirm: bool, caption_path=None):
+    """Publish ``video`` as a Reel (dry run unless ``confirm``) and log the song when it goes live."""
+    from autopost_kit.core.publish import publish_reel
+    from autopost_kit.core.settings import S3Settings
+    from autopost_kit.core.storage import S3Storage
+
+    caption_path = caption_path or video.with_name("reel_caption.txt")
     caption = caption_path.read_text(encoding="utf-8") if caption_path.exists() else ""
     s3 = S3Settings.from_env()
-    result = publish_reel(video, caption, _instagram(), S3Storage(s3.bucket, s3.region), confirm=args.yes)
+    result = publish_reel(video, caption, _instagram(), S3Storage(s3.bucket, s3.region), confirm=confirm)
     if result.published:
         print(f"Published! {result.permalink or result.media_id}")
         _log_music(video, result)
     else:
         print("Dry run OK: Instagram accepted and processed the Reel, but it was NOT published.")
-        print("Run again with --yes to publish it for real.")
+    return result
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    from autopost_kit.core import daily, schedule
+    from autopost_kit.core.music import MusicLibrary
+    from autopost_kit.core.reel import render_reel, render_video_reel
+
+    config = schedule.load_config(args.config, known_topics=set(TOPICS))
+    now = datetime.now(timezone.utc)
+
+    if args.dry:
+        for job in config.jobs:
+            target = job.target(now)
+            record = schedule.read_run(schedule.post_folder(config, job, target))
+            due = job.is_time(now) and not schedule.already_done(record, job.publish)
+            print(f"{job.topic}: {target} at {job.at:%H:%M} {job.timezone}, format={job.format}, "
+                  f"publish={job.publish} -> {'would run now' if due else 'nothing to do now'}")
+        return 0
+
+    library = MusicLibrary(config.music_folder)
+
+    def make_topic(job):
+        return get_topic(job.topic)(overrides=job.topic_overrides())
+
+    def reel(folder, topic):
+        if hasattr(topic, "reel_scenes"):
+            return render_video_reel(folder, topic, library)
+        return render_reel(folder, library)
+
+    results = daily.run_jobs(config, make_topic, _publish_video, reel, now=now, force=args.force, only=args.only)
+    failed = False
+    for r in results:
+        line = f"{r.job.topic}: {r.status}"
+        if r.permalink:
+            line += f" {r.permalink}"
+        print(line)
+        failed = failed or r.status.startswith("failed")
+    return 1 if failed else 0
+
+
+def cmd_schedule(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    script = (Path("scripts") / "run_daily.cmd").resolve()
+    print("Windows: create an hourly task that calls autopost-kit run (it decides the real time):\n")
+    print(f'  schtasks /Create /TN "autopost-kit" /SC HOURLY /MO 1 /TR "\\"{script}\\"" /F\n')
+    print("Then, in Task Scheduler > autopost-kit > Properties > Conditions, tick")
+    print('"Wake the computer to run this task" if the PC sleeps at night.')
+    print("Logs go to output\\logs\\run.log. Remove the task with: schtasks /Delete /TN \"autopost-kit\" /F")
     return 0
 
 
@@ -226,6 +284,16 @@ def build_parser() -> argparse.ArgumentParser:
     reel.add_argument("--caption", help="caption text file (default: reel_caption.txt next to the video)")
     reel.add_argument("--yes", action="store_true", help="really publish (without it: everything but publishing)")
     reel.set_defaults(func=cmd_publish_reel)
+
+    run = sub.add_parser("run", help="carry out the daily jobs from autopost.yaml that are due")
+    run.add_argument("--config", default="autopost.yaml", help="run settings file (default: autopost.yaml)")
+    run.add_argument("--dry", action="store_true", help="only show what each job would do now")
+    run.add_argument("--force", action="store_true", help="run now even if it is early or already done")
+    run.add_argument("--only", metavar="TOPIC", help="run only this topic's job")
+    run.set_defaults(func=cmd_run)
+
+    sched = sub.add_parser("schedule", help="show how to schedule the daily run on this computer")
+    sched.set_defaults(func=cmd_schedule)
 
     topics = sub.add_parser("topics", help="list available topics")
     topics.set_defaults(func=cmd_topics)

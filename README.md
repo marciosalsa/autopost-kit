@@ -91,6 +91,31 @@ Settings live in [`topic.yaml`](src/autopost_kit/topics/steam_releases/topic.yam
 timezone, how many games, blocked title words, colors, hashtags and request
 limits. Post texts live in [`locales/en.yaml`](src/autopost_kit/topics/steam_releases/locales/en.yaml).
 
+## Daily run
+
+Your own preferences live in `autopost.yaml` (git-ignored). Start from the example:
+
+```bash
+copy autopost.example.yaml autopost.yaml     # Linux/macOS: cp
+```
+
+For each job you choose the topic, the time and timezone, how many days ahead,
+the format (`reel`, `carousel` or `both`), the publish mode (`off`, `review`
+or `auto`) and any topic setting to override (number of games, clip length,
+hashtags...).
+
+```bash
+autopost-kit run --dry        # what each job would do right now
+autopost-kit run              # do whatever is due
+autopost-kit run --force      # run now, even if early or already done
+autopost-kit schedule         # how to set up the hourly Windows task
+```
+
+The system scheduler only calls `autopost-kit run` every hour. The run decides
+whether a job is due, and records each finished day in `run.json` next to the
+post, so a day is never posted twice and a run missed while the PC slept is
+caught up at the next hour.
+
 ## Data and content policy
 
 - Data comes from the public Steam store pages and the endpoints the store website
