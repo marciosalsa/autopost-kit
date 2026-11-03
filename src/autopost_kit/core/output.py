@@ -25,8 +25,22 @@ def save_post(post: Post, root: Path | str = "output") -> Path:
     manifest = {
         "topic": post.topic,
         "target": post.target.isoformat(),
+        "total": post.total,
         "slides": files,
         "items": [item.to_dict() for item in post.items],
     }
     (folder / "post.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     return folder
+
+
+def load_post(folder: Path | str) -> dict:
+    """Read ``post.json`` back; ``items`` become :class:`Item` objects again."""
+    from autopost_kit.core.models import Item
+
+    folder = Path(folder)
+    path = folder / "post.json"
+    if not path.exists():
+        raise FileNotFoundError(f"No post.json in {folder}. Run 'autopost-kit build' first.")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["items"] = [Item.from_dict(item) for item in data.get("items", [])]
+    return data

@@ -43,6 +43,12 @@ blocked_words:
 language: en
 hashtags: "#steam #newgames #pcgaming #gaming #indiegames #upcominggames"
 
+# Reel: seconds wanted per scene. With librosa installed, they are rounded
+# to whole bars of the song so every cut lands on the beat.
+reel:
+  cover_seconds: 3.7
+  clip_seconds: 11
+
 # Visual identity of the channel (colors as hex, size in pixels).
 theme:
   width: 1080

@@ -75,6 +75,75 @@ def render_cover(theme: Theme, strings: dict[str, str], target: date, total: int
     return Slide(label="cover", image=image)
 
 
+REEL_SIZE = (1080, 1920)
+#: Instagram draws its own buttons and caption over Reels; keep texts inside this box.
+REEL_SAFE_TOP, REEL_SAFE_BOTTOM, REEL_SAFE_RIGHT = 250, 1560, 940
+#: Where the trailer band (16:9, full width) sits in the Reel.
+REEL_VIDEO_Y = 520
+REEL_VIDEO_H = 608
+
+
+def render_reel_cover(theme: Theme, strings: dict[str, str], target: date, total: int, games: list[Item]) -> Image.Image:
+    """The carousel cover, centered on a 9:16 frame."""
+    cover = render_cover(theme, strings, target, total, games).image
+    frame = Image.new("RGB", REEL_SIZE, theme.rgb("background"))
+    frame.paste(cover, (0, (REEL_SIZE[1] - cover.height) // 2 - 60))
+    return frame
+
+
+def render_reel_overlay(theme: Theme, strings: dict[str, str], target: date, game: Item, rank: int,
+                        fetch: ImageFetcher) -> Image.Image:
+    """Transparent layer drawn over a game's trailer: rank, date, name, genres, studio, badge."""
+    width, height = REEL_SIZE
+    layer = Image.new("RGBA", REEL_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    m = theme.margin
+
+    rank_font = font("display", 190)
+    draw.text((m, REEL_SAFE_TOP + 10), f"#{rank}", font=rank_font, fill=theme.rgb("accent"))
+    label, date_font = _date_label(target), font("display", 70)
+    draw.text((REEL_SAFE_RIGHT - render.text_width(label, date_font), REEL_SAFE_TOP + 40), label,
+              font=date_font, fill=theme.rgb("accent"))
+
+    # Thin accent lines frame the trailer band.
+    for y in (REEL_VIDEO_Y - 6, REEL_VIDEO_Y + REEL_VIDEO_H):
+        draw.rectangle((0, y, width, y + 6), fill=theme.rgb("accent") + (255,))
+
+    max_w = REEL_SAFE_RIGHT - m
+    y = REEL_VIDEO_Y + REEL_VIDEO_H + 50
+    header = fetch(game.image_url)
+    if header is not None:
+        header = header.convert("RGB")
+        header_h = 150
+        header_w = round(header.width * header_h / header.height)
+        layer.alpha_composite(render.rounded(header.resize((header_w, header_h), Image.LANCZOS), 10), (m, y))
+        y += header_h + 30
+
+    title_font, lines = render.fit_lines(game.title.upper(), "display", max_w, (130, 112, 96, 84))
+    for line in lines:
+        draw.text((m, y), line, font=title_font, fill=theme.rgb("text"))
+        y += round(title_font.size * 0.92)
+
+    meta_font, studio_font = font("text", 44, "SemiBold"), font("text", 44, "Bold")
+    genres = " · ".join(game.meta.get("display_genres", [])[:3])
+    if genres:
+        draw.text((m, y + 18), genres, font=meta_font, fill=theme.rgb("muted"))
+        y += 18 + 54
+    studio = ", ".join(game.meta.get("developers", [])[:2])
+    if studio:
+        prefix = strings["by_studio"]
+        draw.text((m, y + 6), prefix, font=meta_font, fill=theme.rgb("muted"))
+        x = m + render.text_width(prefix, meta_font) + 4
+        draw.text((x, y + 6), render.truncate(studio, studio_font, REEL_SAFE_RIGHT - x), font=studio_font,
+                  fill=theme.rgb("text"))
+        y += 6 + 54
+    badge = game.meta.get("badge")
+    if badge and y + 100 < REEL_SAFE_BOTTOM:
+        render.pill(draw, (m, y + 26), badge, font("text", 40, "ExtraBold"), theme.rgb("accent"),
+                    theme.rgb("on_accent"))
+    return layer
+
+
 def render_game(theme: Theme, strings: dict[str, str], target: date, game: Item, rank: int,
                 fetch: ImageFetcher) -> Slide:
     bg = theme.rgb("background")

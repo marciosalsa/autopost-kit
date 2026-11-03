@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+music = ["librosa>=0.10"]
 
 [project.scripts]
 autopost-kit = "autopost_kit.cli:main"

@@ -29,6 +29,12 @@ class Item:
         data["date"] = self.date.isoformat() if self.date else None
         return data
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Item":
+        values = dict(data)
+        values["date"] = date.fromisoformat(values["date"]) if values.get("date") else None
+        return cls(**values)
+
 
 @dataclass
 class Slide:
@@ -47,6 +53,8 @@ class Post:
     slides: list[Slide]
     caption: str
     items: list[Item] = field(default_factory=list)
+    total: int | None = None
+    """How many candidates there were before selection (e.g. games released that day)."""
 
     #: Instagram accepts at most 10 images in a carousel.
     MAX_SLIDES = 10

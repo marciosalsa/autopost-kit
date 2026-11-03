@@ -116,6 +116,20 @@ def collect_releases(store: SteamStore, target: date, config: dict[str, Any]) ->
     return to_items(rows, ranks)
 
 
+def pick_trailer(movies: list[dict[str, Any]]) -> str | None:
+    """Best video URL for a game: the store's highlighted trailer first.
+
+    Steam serves trailers as HLS/DASH streams (``hls_h264``); older entries
+    may still carry plain MP4 links, which ffmpeg reads just as well.
+    """
+    ordered = sorted(movies, key=lambda m: not m.get("highlight"))
+    for movie in ordered:
+        url = movie.get("hls_h264") or (movie.get("mp4") or {}).get("max") or (movie.get("mp4") or {}).get("480")
+        if url:
+            return url
+    return None
+
+
 def enrich(store: SteamStore, item: Item) -> Item:
     """Add genres, studio, price and the header image from the app's store page.
 
@@ -130,6 +144,9 @@ def enrich(store: SteamStore, item: Item) -> Item:
     item.title = details.get("name") or item.title
     item.image_url = details.get("header_image") or item.image_url
     screenshots = details.get("screenshots") or []
+    trailer = pick_trailer(details.get("movies") or [])
+    if trailer:
+        item.meta["trailer"] = trailer
     item.meta.update(
         screenshot=(screenshots[0].get("path_full") if screenshots else None),
         genres=[g.get("description") for g in details.get("genres") or [] if g.get("description")],

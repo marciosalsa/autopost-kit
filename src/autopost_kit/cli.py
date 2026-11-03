@@ -53,6 +53,63 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"  slide_{n:02d}.png  {slide.label}")
     print("\n--- caption.txt ---\n")
     print(post.caption)
+    if args.reel:
+        _render_reel(folder, args.music_dir, None, topic=topic, slideshow=args.slideshow)
+    return 0
+
+
+def _render_reel(folder, music_dir: str, track: str | None, topic=None, slideshow: bool = False,
+                 keep_work: bool = False) -> None:
+    from autopost_kit.core.music import MusicLibrary
+    from autopost_kit.core.reel import render_reel, render_video_reel
+
+    library = MusicLibrary(music_dir)
+    if topic is not None and not slideshow and hasattr(topic, "reel_scenes"):
+        manifest = render_video_reel(folder, topic, library, track=track, keep_work=keep_work)
+    else:
+        manifest = render_reel(folder, library, track=track)
+    print(f"\nReel saved to {folder}/{manifest['video']} ({manifest['seconds']:g}s)")
+    print(f"Music: {manifest['music']}  (logged as used only when published with --yes)")
+    print(f"Caption with music credit: {folder}/{manifest['caption']}")
+
+
+def cmd_reel(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    folder = Path(args.post_dir)
+    if not folder.is_dir():
+        raise SystemExit(f"Post folder not found: {folder}")
+    topic = None
+    manifest = folder / "post.json"
+    if manifest.exists() and not args.slideshow:
+        import json
+
+        topic = get_topic(json.loads(manifest.read_text(encoding="utf-8"))["topic"])()
+    _render_reel(folder, args.music_dir, args.track, topic=topic, slideshow=args.slideshow,
+                 keep_work=args.keep_work)
+    return 0
+
+
+def cmd_music(args: argparse.Namespace) -> int:
+    from autopost_kit.core.music import MusicLibrary
+
+    library = MusicLibrary(args.music_dir)
+    if args.mark:
+        names = {t.name: t for t in library.tracks()}
+        if args.mark not in names:
+            raise SystemExit(f"Not in {library.folder}/: {args.mark}")
+        library.mark_used(args.mark, note="marked by hand")
+        print(f"Marked as used: {args.mark}\n")
+    tracks = library.tracks()
+    if not tracks:
+        print(f"No music in {library.folder}/")
+        return 0
+    used = library.last_used()
+    unused = sum(t.name not in used for t in tracks)
+    print(f"{len(tracks)} tracks in {library.folder}/, {unused} not used yet\n")
+    for t in tracks:
+        status = f"used {used[t.name][:10]}" if t.name in used else "new"
+        print(f"  [{status:<15}] {t.name}")
     return 0
 
 
@@ -87,15 +144,32 @@ def cmd_publish_reel(args: argparse.Namespace) -> int:
     video = Path(args.video)
     if not video.exists():
         raise SystemExit(f"Video not found: {video}")
-    caption = Path(args.caption).read_text(encoding="utf-8") if args.caption else ""
+    caption_path = Path(args.caption) if args.caption else video.with_name("reel_caption.txt")
+    if args.caption and not caption_path.exists():
+        raise SystemExit(f"Caption not found: {caption_path}")
+    caption = caption_path.read_text(encoding="utf-8") if caption_path.exists() else ""
     s3 = S3Settings.from_env()
     result = publish_reel(video, caption, _instagram(), S3Storage(s3.bucket, s3.region), confirm=args.yes)
     if result.published:
         print(f"Published! {result.permalink or result.media_id}")
+        _log_music(video, result)
     else:
         print("Dry run OK: Instagram accepted and processed the Reel, but it was NOT published.")
         print("Run again with --yes to publish it for real.")
     return 0
+
+
+def _log_music(video, result) -> None:
+    from autopost_kit.core.music import MusicLibrary
+    from autopost_kit.core.reel import music_for_video
+
+    found = music_for_video(video)
+    if not found:
+        return
+    track, folder = found
+    MusicLibrary(folder).mark_used(track, video=str(video), media_id=result.media_id or "",
+                                   permalink=result.permalink or "")
+    print(f"Music logged as used: {track}")
 
 
 def cmd_topics(_: argparse.Namespace) -> int:
@@ -122,7 +196,23 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("topic", help="topic id, e.g. steam_releases")
     build.add_argument("--date", help="target day (YYYY-MM-DD); default: the topic's next day")
     build.add_argument("--out", default="output", help="output folder (default: output)")
+    build.add_argument("--reel", action="store_true", help="also render reel.mp4 with an unused song")
+    build.add_argument("--music-dir", default="music", help="music folder (default: music)")
+    build.add_argument("--slideshow", action="store_true", help="Reel from the slide images instead of trailers")
     build.set_defaults(func=cmd_build)
+
+    reel_cmd = sub.add_parser("reel", help="render reel.mp4 from a built post, with an unused song")
+    reel_cmd.add_argument("post_dir", help="post folder, e.g. output/steam_releases/2026-11-03")
+    reel_cmd.add_argument("--music-dir", default="music", help="music folder (default: music)")
+    reel_cmd.add_argument("--track", help="use this audio file instead of picking one")
+    reel_cmd.add_argument("--slideshow", action="store_true", help="use the slide images instead of trailers")
+    reel_cmd.add_argument("--keep-work", action="store_true", help="keep the intermediate clips (_reel_work/)")
+    reel_cmd.set_defaults(func=cmd_reel)
+
+    music = sub.add_parser("music", help="list songs and which ones were already used")
+    music.add_argument("--music-dir", default="music", help="music folder (default: music)")
+    music.add_argument("--mark", metavar="FILE", help="record a song as used (e.g. posted by hand)")
+    music.set_defaults(func=cmd_music)
 
     instagram = sub.add_parser("instagram", help="Instagram account tools")
     ig_sub = instagram.add_subparsers(dest="ig_command", required=True)
@@ -133,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
     pub_sub = publish.add_subparsers(dest="pub_command", required=True)
     reel = pub_sub.add_parser("reel", help="publish an MP4 as a Reel")
     reel.add_argument("video", help="path to the .mp4 file")
-    reel.add_argument("--caption", help="path to a text file with the caption")
+    reel.add_argument("--caption", help="caption text file (default: reel_caption.txt next to the video)")
     reel.add_argument("--yes", action="store_true", help="really publish (without it: everything but publishing)")
     reel.set_defaults(func=cmd_publish_reel)
 

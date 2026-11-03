@@ -33,7 +33,17 @@ Carousel for `steam_releases` (6 slides, 1080×1350):
    the store header art, genres, studio and a badge (Early Access, Free to Play or price)
 
 The caption lists the 5 games with studio credits, how many more launch that
-day and the hashtags. Music is chosen by hand in the Instagram app.
+day and the hashtags.
+
+### Reels with music
+
+Put songs in `music/` (ignored by git). `autopost-kit reel <post folder>` (or
+`build ... --reel`) turns the slides into `reel.mp4` (9:16, 3 s per slide) with
+a song that hasn't been used yet, and writes `reel_caption.txt` with the song
+credit (from `music/<song>.txt` when present, otherwise from the file name).
+A song is logged in `music/used.json` only when the Reel is published with
+`--yes`; once every song was used, the one used longest ago comes back.
+`autopost-kit music` lists the songs and their status. Requires `ffmpeg`.
 
 ## Requirements
 
